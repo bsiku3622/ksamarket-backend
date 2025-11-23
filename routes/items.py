@@ -18,6 +18,62 @@ from utils.jwt import get_current_user
 router = APIRouter()
 
 
+@router.get("/market")
+def get_items(
+    request: Request,
+    db: SQLSession = Depends(get_db),
+):
+    try:
+        user = get_current_user(request, db)
+        items = (
+            db.query(Item)
+            .filter(
+                Item.status != ItemStatus.DELETED,
+                Item.type == ItemType.MARKET,
+                Item.seller_id != user.id,
+            )
+            .order_by(
+                Item.created_at.desc()
+            )  # Order by creation date in descending order
+            .limit(20)  # Limit to the latest 20 items
+        ).all()
+        return items
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/lost")
+def get_lost_items(
+    request: Request,
+    db: SQLSession = Depends(get_db),
+):
+    try:
+        user = get_current_user(request, db)
+        items = (
+            db.query(Item)
+            .filter(
+                Item.status != ItemStatus.DELETED,
+                Item.type == ItemType.LOST,
+                Item.seller_id != user.id,
+            )
+            .order_by(
+                Item.created_at.desc()
+            )  # Order by creation date in descending order
+            .limit(20)  # Limit to the latest 20 items
+        ).all()
+        return items
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.post("/market")
 def create_market_item(
     data: MarketItemCreate,

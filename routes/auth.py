@@ -9,7 +9,6 @@ from fastapi import (
 )
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
-from sqlalchemy import or_
 from db.connection import get_db
 from db.models import (
     TokenCreate,
@@ -33,7 +32,6 @@ from email.message import EmailMessage
 import secrets
 import string
 
-from utils.jwt import get_current_user
 
 router = APIRouter()
 
@@ -97,11 +95,11 @@ def create_email_verifications(
 
         token = random_string(48) + str(int(datetime.now().timestamp()) * 1000000)
 
-        email_verification_tokens[data.id] = {
+        email_verification_tokens[user.id] = {
             "token": token,
             "expires_at": datetime.now(timezone.utc) + timedelta(hours=1),
         }
-        background_tasks.add_task(send_verification_email, data.id, token, data.email)
+        background_tasks.add_task(send_verification_email, user.id, token, data.email) # type: ignore
         return {"message": "Verification email sent successfully"}
     except HTTPException:
         db.rollback()
@@ -155,7 +153,7 @@ def check_email_vefications(id: int, token: str, db: SQLSession = Depends(get_db
 
 
 @router.post("/token", description="Login and create JWT token")
-def create_token(data: TokenCreate, db: SQLSession = Depends(get_db)):
+def create_token(data: TokenCreate, request: Request, db: SQLSession = Depends(get_db)):
     try:
         user = (
             db.query(User)
@@ -183,7 +181,14 @@ def create_token(data: TokenCreate, db: SQLSession = Depends(get_db)):
 
         # return {"access_token": access_token, "token_type": "bearer"}
         response = Response(status_code=200)
-        response.set_cookie(key="token", value=f"Bearer {access_token}", httponly=True)
+        response.set_cookie(
+            key="token",
+            secure=True,
+            value=f"Bearer {access_token}",
+            httponly=True,
+            samesite="lax",
+            domain=request.url.hostname,
+        )
         return response
     except HTTPException:
         raise

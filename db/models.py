@@ -147,7 +147,6 @@ class UserResponse(BaseModel):
 
 
 class VerificationEmailCreate(BaseModel):
-    id: int
     email: EmailStr
 
 
